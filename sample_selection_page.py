@@ -37,18 +37,36 @@ import galaxy_class as gc
 import os
 
 
+if flask.current_app:
+    # flask server already exists, which is created within dasha.
+    # from dasha.web.extensions.dasha import dash_app as app
+    from dasha.web.extensions.dasha import dash_app as app
+    from dasha.web.extensions.cache import cache
+    cache_func = cache.memoize()
+    app.config.external_stylesheets.append(dbc.themes.LUX)
+else:
+    app = dash.Dash(external_stylesheets=[dbc.themes.LUX])
+    server = app.server
+    # need to make available the parent as package
+    # this is already done in dasha_app.py if run from DashA
+    sys.path.insert(0, Path(__file__).resolve().parent.parent.as_posix())
+    cache_func = functools.lru_cache
+
 #Create app 
-external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+# external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
+# app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 
 # Get Paths to data (csv and fits)
-dustopedia_csv = os.path.join('Samples','dustopedia_sample.csv')
+datadir = Path(__file__).parent.joinpath('data')
+dustopedia_csv = datadir.joinpath('Samples/dustopedia_sample.csv')
 
-kingfish_csv = os.path.join('Samples','kingfish_sample.csv')
-kingfish_fits = os.listdir("C:\Fall_2020_Wilson_Lab\SN_Page\Samples\Kingfish_FITS\Spire\KINGFISH_SPIRE_v3.0_updated\KINGFISH_SPIRE_v3.0_updated")
+kingfish_csv = datadir.joinpath('Samples/kingfish_sample.csv')
+#kingfish_fits = os.listdir("C:\Fall_2020_Wilson_Lab\SN_Page\Samples\Kingfish_FITS\Spire\KINGFISH_SPIRE_v3.0_updated\KINGFISH_SPIRE_v3.0_updated")
+kingfish_fits = datadir.joinpath("Samples/Kingfish_FITS/Spire/KINGFISH_SPIRE_v3.0_updated/KINGFISH_SPIRE_v3.0_updated").iterdir()
 
-dgs_csv = os.path.join('Samples','dgs_sample.csv')
-dgs_fits = os.listdir("C:\Fall_2020_Wilson_Lab\SN_Page\Samples\DGS_FITS\Renamed_FITs")
+dgs_csv = datadir.joinpath('Samples','dgs_sample.csv')
+#dgs_fits = os.listdir("C:\Fall_2020_Wilson_Lab\SN_Page\Samples\DGS_FITS\Renamed_FITs")
+dgs_fits = datadir.joinpath("Samples/DGS_FITS/Renamed_FITs")
 
 # Create galaxy objects for each sample
 dustopedia = gc.Sample('Dustopedia',dustopedia_csv)
