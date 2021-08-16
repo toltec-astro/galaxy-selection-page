@@ -22,9 +22,14 @@ import copy
 import plotly.express as px
 import dash
 from lmfit import Model, Parameter, report_fit
+from pathlib import Path
+
+
+datadir = Path(__file__).parent.joinpath('data').as_posix()
+
 
 class Sample:
-    def __init__(self, sample, csv, fits=[]):
+    def __init__(self, sample, csv, fits=None):
         self.sample = sample
         self.data = pd.read_csv(csv)
 
@@ -44,7 +49,9 @@ class Sample:
         #Default fit status
         self.fit_status ='Not Fit'
 
-        self.fits = fits        #paths to all files in fits directory
+        if fits is None:
+            fits = list()
+        self.fits = fits       #paths to all files in fits directory
         self.add_column('250 band')
         self.add_column('350 band')
         self.add_column('500 band')
@@ -67,25 +74,37 @@ class Sample:
     # Change FITS file names to NED names and removes path which is not to a fits file
     def fix_FITS_names(self, sample):
         fits = []
+        print(f'{self.fits=}')
         if sample == 'Kingfish':
             for i in self.fits[1:]:
-                name = i.split('_')[0]
-                newName = Ned.query_object(name)['Object Name'][0]
-                newNameFixed = newName.split(' ')[0]
-                for index in range(1,len(newName.split(' '))):
-                    newNameFixed = newName + '_' + newName.split(' ')[index]
-                fits.append(newName + '_' + i.split('_')[1] + '_' +
+                try:
+                    i = os.path.basename(i)
+                    name = i.split('_')[0]
+                    newName = Ned.query_object(name)['Object Name'][0]
+                    newNameFixed = newName.split(' ')[0]
+                    for index in range(1,len(newName.split(' '))):
+                        newNameFixed = newName + '_' + newName.split(' ')[index]
+                    fits.append(newName + '_' + i.split('_')[1] + '_' +
                             i.split('_')[2] + '_' + i.split('_')[3] + '_' +
                             i.split('_')[4])
+                except Exception:
+                    print(f'unable to fix name for {i}')
+                    pass
         elif sample == 'DGS':
             for i in self.fits:
-                name = i.split('_')[0]
-                newName = Ned.query_object(name)['Object Name'][0]
-                newNameFixed = newName.split(' ')[0]
-                for index in range(1,len(newName.split(' '))):
-                    newNameFixed = newName + '_' + newName.split(' ')[index]
-                fits.append(newName + '_' + i.split('_')[1] + '_' +
+                i = os.path.basename(i)
+                try:
+                    name = i.split('_')[0]
+                    newName = Ned.query_object(name)['Object Name'][0]
+                    newNameFixed = newName.split(' ')[0]
+                    for index in range(1,len(newName.split(' '))):
+                        newNameFixed = newName + '_' + newName.split(' ')[index]
+                    fits.append(newName + '_' + i.split('_')[1] + '_' +
                             i.split('_')[2])
+                except Exception:
+                    print(f'unable to fix name for {i}')
+                    pass
+
         return fits
             
     # Adds new columns
@@ -116,9 +135,9 @@ class Sample:
     def loadSpire(self,fits_paths, fixed_name_fits, name, sample):     
         hdu = 0
         if sample == 'Kingfish':
-            path = os.path.join('Samples/Kingfish_FITS/Spire/KINGFISH_SPIRE_v3.0_updated/KINGFISH_SPIRE_v3.0_updated')
+            path = os.path.join(datadir, 'Samples/Kingfish_FITS/Spire/KINGFISH_SPIRE_v3.0_updated_updated/KINGFISH_SPIRE_v3.0_updated_updated')
         elif sample == 'DGS':
-            path = os.path.join("Samples/DGS_FITS/Renamed_FITs")
+            path = os.path.join(datadir, "Samples/DGS_FITS/Renamed_FITs")
         for i in fits_paths:
             if(('250' in i) and ('scan.fits' in i)):
                 self.add_data('250 band',self.data['Object Name'] == name,os.path.join(path, i))

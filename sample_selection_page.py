@@ -29,12 +29,14 @@ from dash.dependencies import Input, Output
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy.io import fits, ascii
-from astropy.utils.data import get_pkg_data_filename
+# from astropy.utils.data import get_pkg_data_filename
 import dash_bootstrap_components as dbc
 from astropy.wcs import WCS
 from astropy.visualization.wcsaxes import WCSAxes
-import galaxy_class as gc
+from galaxy_selection_page import galaxy_class as gc
 import os
+import flask
+from pathlib import Path
 
 
 if flask.current_app:
@@ -58,15 +60,14 @@ else:
 
 # Get Paths to data (csv and fits)
 datadir = Path(__file__).parent.joinpath('data')
-dustopedia_csv = datadir.joinpath('Samples/dustopedia_sample.csv')
+dustopedia_csv = datadir.joinpath('Samples/dustopedia_sample.csv').as_posix()
 
-kingfish_csv = datadir.joinpath('Samples/kingfish_sample.csv')
-#kingfish_fits = os.listdir("C:\Fall_2020_Wilson_Lab\SN_Page\Samples\Kingfish_FITS\Spire\KINGFISH_SPIRE_v3.0_updated\KINGFISH_SPIRE_v3.0_updated")
-kingfish_fits = datadir.joinpath("Samples/Kingfish_FITS/Spire/KINGFISH_SPIRE_v3.0_updated/KINGFISH_SPIRE_v3.0_updated").iterdir()
+kingfish_csv = datadir.joinpath('Samples/kingfish_sample.csv').as_posix()
+kingfish_fits = os.listdir(datadir.joinpath("Samples/Kingfish_FITS/Spire/KINGFISH_SPIRE_v3.0_updated_updated/KINGFISH_SPIRE_v3.0_updated_updated").as_posix())
 
-dgs_csv = datadir.joinpath('Samples','dgs_sample.csv')
+dgs_csv = datadir.joinpath('Samples','dgs_sample.csv').as_posix()
 #dgs_fits = os.listdir("C:\Fall_2020_Wilson_Lab\SN_Page\Samples\DGS_FITS\Renamed_FITs")
-dgs_fits = datadir.joinpath("Samples/DGS_FITS/Renamed_FITs")
+dgs_fits = os.listdir(datadir.joinpath("Samples/DGS_FITS/Renamed_FITs").as_posix())
 
 # Create galaxy objects for each sample
 dustopedia = gc.Sample('Dustopedia',dustopedia_csv)
@@ -266,7 +267,7 @@ def updateFitsImage(selected_sample, name, skyClickData, band):
             if (kingfish.data[band][row].values[0] != None):
                 color_label, x, y = kingfish.update_herschel('Kingfish', name, band)
                 img_path = kingfish.data[band][row].values[0]
-                img_data = get_pkg_data_filename(img_path)  
+                img_data = img_path
                 img = fits.getdata(img_data, ext=0)
                 fig = px.imshow(img, x=x, y=y, zmax=img.max(), labels = {'color': color_label})
                 fig.update_xaxes(title='x (arcsec)')
@@ -279,7 +280,7 @@ def updateFitsImage(selected_sample, name, skyClickData, band):
             if (dgs.data[band][row].values[0] != None):
                 color_label, x, y = dgs.update_herschel('DGS',name, band)
                 img_path = dgs.data[band][row].values[0]
-                img_data = get_pkg_data_filename(img_path)  
+                img_data = img_path
                 img = fits.getdata(img_data, ext=0)
                 fig = px.imshow(img, x=x, y=y, zmax=img.max(), labels = {'color': color_label})
                 fig.update_xaxes(title='x (arcsec)')
@@ -295,7 +296,7 @@ def updateFitsImage(selected_sample, name, skyClickData, band):
                 kingfish = samples['Kingfish']
                 color_label, x, y = kingfish.update_herschel(selected_sample, name, band)
                 img_path = sample.data[band][sample.data['Object Name'] == name].values[0]
-                img_data = get_pkg_data_filename(img_path)
+                img_data = img_path
                 img = fits.getdata(img_data, ext=0)
                 fig = px.imshow(img, x=x, y=y, zmax=img.max(), labels = {'color': color_label})
                 fig.update_xaxes(title='x (arcsec)')
@@ -310,7 +311,7 @@ def updateFitsImage(selected_sample, name, skyClickData, band):
                 print(dgs.data[band][row].values[0])
                 color_label, x, y = dgs.update_herschel(selected_sample, name, band)
                 img_path = sample.data[band][sample.data['Object Name'] == name].values[0]
-                img_data = get_pkg_data_filename(img_path)
+                img_data = img_path
                 img = fits.getdata(img_data, ext=0)
                 fig = px.imshow(img, x=x, y=y, zmax=img.max(), labels = {'color': color_label})
                 fig.update_xaxes(title='x (arcsec)')

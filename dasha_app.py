@@ -3,6 +3,7 @@
 
 from dasha.web.templates import ComponentTemplate
 import dash_html_components as html
+import dash_bootstrap_components as dbc
 import sys
 from pathlib import Path
 
@@ -13,7 +14,8 @@ sys.path.insert(0, Path(__file__).parent.parent.as_posix())
 
 class GalaxySelectionPage(ComponentTemplate):
 
-    _component_cls = html.Div
+    _component_cls = dbc.Container
+    fluid=True
 
     def setup_layout(self, app):
         from galaxy_selection_page import sample_selection_page  # noqa: F401
