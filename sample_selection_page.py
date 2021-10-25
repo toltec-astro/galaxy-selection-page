@@ -1,444 +1,406 @@
+#! /usr/bin/env python
 """
-Created on Thu Mar  4 14:38:20 2021
+Created on Wed May 26 10:42:52 2021
 
 @author: Caleigh Ryan
 
-Version 2.1 of Sample definition page
+Create class to hold header, header data you need in functions, 
+pass to get flux (make wcs for all 3 bands in getFlux())
 
-Implements galaxy_class to read in sample
+Convert pix on all 3 to Ra/Dec (allpic2world), convert back to pixels for each band (different)
 """
-
-"""
-Created on Thu Mar  4 14:38:20 2021
-
-@author: Caleigh Ryan
-
-Version 2.1 of Sample definition page
-
-Implements galaxy_class to read in sample
-"""
-
-import dash
-import dash_core_components as dcc
-import dash_html_components as html
-import plotly.express as px
 import plotly.graph_objs as go
-import pandas as pd
-from astropy.table import Table, Column
-from dash.dependencies import Input, Output
-import numpy as np
-import matplotlib.pyplot as plt
-from astropy.io import fits, ascii
-from astropy.utils.data import get_pkg_data_filename
-import dash_bootstrap_components as dbc
-from astropy.wcs import WCS
-from astropy.visualization.wcsaxes import WCSAxes
-import galaxy_class as gc
 import os
+import dash
 
+import sys
+sys.path.insert(0, r"C:\Fall_2020_Wilson_Lab\SN_page\galaxy-selection-page")
 
-#Create app 
-external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+from sample_selection_class import sample_definition_class
 
-# Get Paths to data (csv and fits)
-dustopedia_csv = os.path.join('Samples','dustopedia_sample.csv')
+from dash.dependencies import Output, Input
+from dash import no_update, exceptions
+import functools
+# This import grabs the main class setup components
+from dasha.web.templates import ComponentTemplate
+from dasha.web.extensions.cache import cache
+from tollan.utils.log import timeit, get_logger
 
-kingfish_csv = os.path.join('Samples','kingfish_sample.csv')
-kingfish_fits = os.listdir("C:\Fall_2020_Wilson_Lab\SN_Page\Samples\Kingfish_FITS\Spire\KINGFISH_SPIRE_v3.0_updated\KINGFISH_SPIRE_v3.0_updated")
+# We get the usual dash bootstrap components in a different way in dasha
+import dash_bootstrap_components as dbc
+import dash_core_components as dcc
 
-dgs_csv = os.path.join('Samples','dgs_sample.csv')
-dgs_fits = os.listdir("C:\Fall_2020_Wilson_Lab\SN_Page\Samples\DGS_FITS\Renamed_FITs")
+from dasha.web.templates.common import LiveUpdateSection
+import dash_html_components as html
+# This is the main class that includes everything.  All code should be ran
+# from inside this class.  The name is yours to choose.
 
-# Create galaxy objects for each sample
-dustopedia = gc.Sample('Dustopedia',dustopedia_csv)
-kingfish = gc.Sample('Kingfish',kingfish_csv,kingfish_fits)
-dgs = gc.Sample('DGS', dgs_csv, dgs_fits)
+class sample_definition_page(ComponentTemplate):
+    _component_cls = dbc.Container
 
-# Create names list for fits dropdown, and dictionary mapping to galaxy objects
-names = []
-for name in kingfish.data['Object Name']:
-    if type(name) is str:
-        names.append({'label': name, 'value': name})
-samples = {'Kingfish': kingfish, 'DGS': dgs, 'Dustopedia': dustopedia} 
+    # fluid controls if the components will resize and rearrange when the
+    # window is resized.
+    fluid = True
+    logger = get_logger()
+    
+    sc = sample_definition_class()
 
-def get_galaxy_names(selected_sample='Kingfish'):
-    galaxy_names = []
-    sample = samples[selected_sample]
-    for name in sample.data['Object Name']:
-        if type(name) is str:
-            galaxy_names.append({'label': name, 'value': name})
-    return galaxy_names
+    # def __init__(self, *args, **kwargs):
+    #     super().__init__(*args, **kwargs)
 
-# Options for scatterplot and histogram axes
-axes_options = ['Object Name','RA','DEC','Redshift','Distance','Log Stellar Mass','Metallicity','Diameter (arcsec)']
+    # Set up all of your components and call-backs in this function.  You can
+    # also define other functions and call them in here.  Note that it takes
+    # the dash 'app' as input for the call-backs.
+    def setup_layout(self, app):
+        app.config.external_stylesheets.append(dbc.themes.LUX)
+        container = self
 
-# Options for sample names dropdown
-sampleNames = ['Kingfish', 'DGS', 'Dustopedia']
+        # Create two rows for header and body
+        header_container, body = container.grid(2,1)
+        
+        # Create the header as a child of the header_container.
+        header = header_container.child(LiveUpdateSection(
+            title_component=html.H2("Galaxy Selection",
+                                    style={
+                                        'margin-top': '50px',
+                                        'margin-bottom': '50px'
+                                        }),
+            interval_options=[2000, 5000],
+            interval_option_value=5000))
 
-#App setup
-header = html.Div(dbc.Row(dbc.Col(html.Div(
-    html.H2("Sample Selection",
-            style={
-                'margin-top': '50px',
-                'margin-left': '40%',
-                'margin-bottom': '50px'
-                })))))
+        # Row containing the sample, galaxy, herschel band, toltec band, map type dropdowns
+        fits_dropdowns_container = body.child(dbc.Row, 
+                                    style={
+                                    'margin-top': '50px',
+                                    'margin-bottom': '50px'
+                                    })
+        
+        sample_dropdown = fits_dropdowns_container.child(dbc.Col, style={'display': 'inline-block', 'width': '20%'}).child(
+                                    dcc.Dropdown,
+                                    style={})
+        sample_dropdown.options = self.sc.get_sample_names()
+        sample_dropdown.value = 'Kingfish'
 
-row1 = html.Div(dbc.Row([
-            dbc.Col(html.Div(
-                dcc.Dropdown(
-                    id='sample',
-                    options=[{'label': i, 'value': i} for i in sampleNames],
-                    value='Kingfish'
-                )
-            ), style={'width': '33%'}),
-            dbc.Col(html.Div(
-                dcc.Dropdown(
-                    id='galaxy-name',
-                    options=get_galaxy_names(),
-                    value=names[1]['value']
-                )
-            ), style={'width': '33%'}),
-            dbc.Col(html.Div(
-                dcc.Dropdown(
-                id='band',
-                    options=[{'label':'500 band', 'value':'500 band'}, 
-                            {'label':'350 band','value':'350 band'}, 
-                            {'label':'250 band', 'value':'250 band'}],
-                    value='250 band'
-                )
-            ), style={'width': '33%'})
-        ], style={'display': 'flex'})
-    )
+        galaxy_dropdown = fits_dropdowns_container.child(dbc.Col, style={'display': 'inline-block', 'width': '20%'}).child(
+                                    dcc.Dropdown,
+                                    style={})
+        galaxy_dropdown.options = self.sc.get_galaxy_names()
+        galaxy_dropdown.value = self.sc.get_galaxy_names()[1]['value']
 
-row2 = html.Div(dbc.Row(
-        dbc.Col(html.Div(dcc.Graph(id='fits-image'))),
-        style={'display': 'flex','margin-left':'20%'})
-    )
+        herschel_band_dropdown = fits_dropdowns_container.child(dbc.Col, style={'display': 'inline-block', 'width': '20%'}).child(
+                                    dcc.Dropdown,
+                                    style={})
+        herschel_band_dropdown.options = self.sc.get_herschel_bands()
+        herschel_band_dropdown.value = '250 band'
 
-row3 = html.Div(dbc.Row(
-        dbc.Col(html.Div(dcc.Graph(id='sky-map'))),
-        style={'display': 'flex','margin-left':'20%'})
-    )
+        toltec_band_dropdown = fits_dropdowns_container.child(dbc.Col, style={'display': 'inline-block', 'width': '20%'}).child(
+                                    dcc.Dropdown,
+                                    style={})
+        toltec_band_dropdown.options = self.sc.get_toltec_bands()
+        toltec_band_dropdown.value = '1.1 mm'
 
-row4 = html.Div(dbc.Row([
-            dbc.Col([
-                dbc.Row([
-                    dbc.Col(html.Div(
-                        dcc.Dropdown(
-                            id='x-dropdown',
-                            options=[{'label':i, 'value':i} for i in axes_options],
-                            value='RA'
-                        )
-                    ), style={'width': '50%'}),
-                    dbc.Col(html.Div(
-                        dcc.Dropdown(
-                            id='y-dropdown',
-                            options=[{'label':i, 'value':i} for i in axes_options],
-                            value='DEC'
-                        )
-                    ), style={'width': '50%'}),   
-                ], style={'display': 'flex'}),
-                dbc.Row(
-                    dbc.Col(html.Div(dcc.Graph(id='scatter')),
-                        style={'display':'flex'})
-                )
-            ], style={'width': '50%'}),
-            dbc.Col([
-                dbc.Row(
-                    dbc.Col(html.Div(
-                        dcc.Dropdown(
-                            id='hist-param',
-                            options=[{'label':i, 'value':i} for i in axes_options],
-                            value='Redshift'
-                        )
-                    ))
-                ),
-                dbc.Row(
-                    dbc.Col(html.Div(dcc.Graph(id='histogram')))
-                )
-            ], style={'width': '50%'})
-        ], style={'display': 'flex'})
-    )
-sky_map_text = html.Div(dbc.Row(dbc.Col(html.Div(
-    dcc.Markdown('Select points from the All Sky Map to plot the image of the galaxy above.')
-))))
+        signal_uncertainty_button = fits_dropdowns_container.child(dbc.Col, style={'display': 'inline-block', 'width': '20%'}).child(
+                                    dcc.RadioItems,
+                                    style={
+                                    'width': '35%'
+                                    })
+        signal_uncertainty_button.options = self.sc.get_sig_unc()
+        signal_uncertainty_button.value = 'S/N'
 
-scatter_hist_text = html.Div(dbc.Row(dbc.Col(html.Div(
-    dcc.Markdown('Use the box select tool on the scatter plot and histogram to filter galaxies on the All Sky Map.')
-))))
+        # Row containing herschel and toltec fits images
+        herschel_toltec_fits = body.child(dbc.Row, 
+                                    style={})
 
-app.layout = html.Div(children=[
-    header,
-    row1,
-    row2,
-    sky_map_text,
-    row3,
-    scatter_hist_text,
-    row4
-])
+        herschel_fits_image = herschel_toltec_fits.child(dbc.Col, 
+                                    style = {'width': '50%', 'display': 'inline-block'}).child(
+                                        dcc.Graph, figure=go.Figure(),
+                                        style={
+                                        # 'width': '34%',
+                                        # 'margin-left': '30%'
+                                    })
+        
+        toltec_fits_image = herschel_toltec_fits.child(dbc.Col, 
+                                    style = {'width': '50%', 'display': 'inline-block'}).child(
+                                        dcc.Graph, figure=go.Figure(),
+                                        style={
+                                        # 'width': '34%',
+                                        # 'margin-left': '30%'
+                                    })
+        
+        # Row containing fits mapping options
+        options_checklist = body.child(dbc.Row).child(dbc.Checklist,
+                                                       options=[
+                {"label": "Show Map Area", "value": "show map"},
+                {"label": "Show Array", "value": "show array"},
+                {"label": "Log Scale", "value": "log_scale"}
+                ],
+                inline=True,
+                style={"margin-right": "0px",
+                    "margin-left": "450px",
+                    "margin-bottom": "50"})
+        
+        # Row containing fitting options
+        fitting_inputs = body.child(dbc.Row,
+                                    style={
+                                    'margin-top': '50px',
+                                    'margin-bottom': '50px',
+                                    'width': '100%'
+                                    }).child(dbc.InputGroup, size='sm',
+                                    style={
+                                    "margin-right": "20px",
+                                    "margin-left": "20px"
+                                    })
 
-@app.callback(
-    Output('sample', 'value'),
-    Input('sky-map', 'clickData')  
-)
+        
+        #Change integration time
+        fitting_inputs.child(dbc.InputGroupAddon("Time (hrs)", addon_type="prepend"))
+        fit_time_input = fitting_inputs.child(dbc.Input, value=1.0)
 
-def updateSampleDropdown(skyClickData):
-    event = dash.callback_context.triggered[0]["prop_id"].split('.')[0]
-    if (event == 'sky-map'):
-        if (skyClickData['points'][0]['x'] in samples['Kingfish'].data['RA'].unique()):
-            return 'Kingfish'
-        elif (skyClickData['points'][0]['x'] in samples['DGS'].data['RA'].unique()):
-            return 'DGS'
-        else:
-            return 'Dustopedia'
-    else: return dash.no_update
+        #Change map area
+        fitting_inputs.child(dbc.InputGroupAddon("Area (deg^2)", addon_type="prepend"))
+        fit_area_input = fitting_inputs.child(dbc.Input, value=0.1)
 
-@app.callback(
-    [Output('galaxy-name','options'),
-    Output('galaxy-name', 'value')],
-    [Input('sample','value'), 
-    Input('sky-map','clickData')]
-)
-def updateNamesDropdown(selected_sample, skyClickData):
-    event = dash.callback_context.triggered[0]["prop_id"].split('.')[0]
-    if (event == 'sky-map'):
-        if (skyClickData['points'][0]['x'] in samples['Kingfish'].data['RA'].unique()):
-            kingfish = samples['Kingfish']
-            index = kingfish.data.index
-            row = index[kingfish.data['RA'] == skyClickData['points'][0]['x']]
-            value = kingfish.data['Object Name'][row].values[0]
+        #Change atmosphere factor (1-7)
+        fitting_inputs.child(dbc.InputGroupAddon("Atm Factor (1-7)", addon_type="prepend"))
+        fit_atm_input = fitting_inputs.child(dbc.Input, value=1.0)
 
-            new_names = get_galaxy_names('Kingfish')
-            return new_names, value
-        elif (skyClickData['points'][0]['x'] in samples['DGS'].data['RA'].unique()):
-            dgs = samples['DGS']
-            index = dgs.data.index
-            row = index[dgs.data['RA'] == skyClickData['points'][0]['x']]
-            value = dgs.data['Object Name'][row].values[0]
-            new_names = get_galaxy_names('DGS')
-            return new_names, value
-        else:
-            return [{'label': 'No Dustopedia Fits', 'value': 'dustopedia'}],'No Dustopedia Fits'
-    else: 
-        if selected_sample == 'Kingfish':
-            new_names = get_galaxy_names(selected_sample)
-            return new_names, new_names[1]['value'] 
-        elif selected_sample == 'DGS':
-            new_names = get_galaxy_names(selected_sample)
-            return new_names, new_names[1]['value'] 
-        else:
-            return [{'label': 'No Dustopedia Fits', 'value': 'Dustopedia'}], 'Dustopedia' 
+        #Change spectral index for greybody
+        fitting_inputs.child(dbc.InputGroupAddon("Spectral Index", addon_type="prepend"))
+        fit_beta_input = fitting_inputs.child(dbc.Input, value=2.0)
 
-@app.callback(
-    Output('fits-image','figure'),
-    [Input('sample','value'),
-     Input('galaxy-name','value'),
-     Input('sky-map', 'clickData'),
-     Input('band', 'value')]
-    )
-def updateFitsImage(selected_sample, name, skyClickData, band): 
-    event = dash.callback_context.triggered[0]["prop_id"].split('.')[0]
-    if event == 'sky-map':
-        if (skyClickData['points'][0]['x'] in samples['Kingfish'].data['RA'].unique()):
-            kingfish = samples['Kingfish']
-            index = kingfish.data.index
-            row = index[kingfish.data['RA'] == skyClickData['points'][0]['x']]
-            if (kingfish.data[band][row].values[0] != None):
-                color_label, x, y = kingfish.update_herschel('Kingfish', name, band)
-                img_path = kingfish.data[band][row].values[0]
-                img_data = get_pkg_data_filename(img_path)  
-                img = fits.getdata(img_data, ext=0)
-                fig = px.imshow(img, x=x, y=y, zmax=img.max(), labels = {'color': color_label})
-                fig.update_xaxes(title='x (arcsec)')
-                fig.update_yaxes(title='y (arcsec)')
-            else: fig = {}
-        elif (skyClickData['points'][0]['x'] in samples['DGS'].data['RA'].unique()):
-            dgs = samples['DGS']
-            index = dgs.data.index
-            row = index[dgs.data['RA'] == skyClickData['points'][0]['x']]
-            if (dgs.data[band][row].values[0] != None):
-                color_label, x, y = dgs.update_herschel('DGS',name, band)
-                img_path = dgs.data[band][row].values[0]
-                img_data = get_pkg_data_filename(img_path)  
-                img = fits.getdata(img_data, ext=0)
-                fig = px.imshow(img, x=x, y=y, zmax=img.max(), labels = {'color': color_label})
-                fig.update_xaxes(title='x (arcsec)')
-                fig.update_yaxes(title='y (arcsec)')
-            else: fig = {}
-        else: fig = {}
-    else:
-        if selected_sample == 'Kingfish':
-            sample = samples[selected_sample]
-            index = sample.data.index
-            row = index[sample.data['Object Name'] == name]
-            if (sample.data[band][row].values[0] != None):
-                kingfish = samples['Kingfish']
-                color_label, x, y = kingfish.update_herschel(selected_sample, name, band)
-                img_path = sample.data[band][sample.data['Object Name'] == name].values[0]
-                img_data = get_pkg_data_filename(img_path)
-                img = fits.getdata(img_data, ext=0)
-                fig = px.imshow(img, x=x, y=y, zmax=img.max(), labels = {'color': color_label})
-                fig.update_xaxes(title='x (arcsec)')
-                fig.update_yaxes(title='y (arcsec)')
-            else: fig = {}
-        elif  selected_sample == 'DGS':
-            sample = samples[selected_sample]
-            index = sample.data.index
-            row = index[sample.data['Object Name'] == name]
-            if (sample.data[band][row].values[0] != None):
-                dgs = samples['DGS']
-                print(dgs.data[band][row].values[0])
-                color_label, x, y = dgs.update_herschel(selected_sample, name, band)
-                img_path = sample.data[band][sample.data['Object Name'] == name].values[0]
-                img_data = get_pkg_data_filename(img_path)
-                img = fits.getdata(img_data, ext=0)
-                fig = px.imshow(img, x=x, y=y, zmax=img.max(), labels = {'color': color_label})
-                fig.update_xaxes(title='x (arcsec)')
-                fig.update_yaxes(title='y (arcsec)')
-            else: fig = {}
-        else: fig = {}
-    return fig
+        # Container for the row containing the flux fit and table
+        flux_fit_and_data_table = body.child(dbc.Row,
+                                    style={
+                                    'margin-top': '50px',
+                                    'margin-bottom': '50px',
+                                    'width': '100%'
+                                    })
+        
+        flux_fit = flux_fit_and_data_table.child(dbc.Col, style={'width': '50%', 'display': 'inline-block'}).child(dbc.Col).child(    
+                                    dcc.Graph, figure=go.Figure(),
+                                    style={})
+        tbl = dbc.Table.from_dataframe(self.sc.get_empty_fit_table())
+        flux_fit_table = flux_fit_and_data_table.child(dbc.Col, style={'width': '50%', 'display': 'inline-block'}).child(dbc.Col).child(    
+                                    dbc.Table, tbl,
+                                    striped=True,
+                                    bordered=True,
+                                    hover=True
+                                )
+        
+        # Container for the row containing the all sky map
+        all_sky_map_row = body.child(dbc.Row,
+                                    style={
+                                    'margin-top': '50px',
+                                    'margin-bottom': '50px',
+                                    'width': '100%'
+                                    })
+        
+        #Container for row containing all sky map and hover preview image
+        all_sky_map = all_sky_map_row.child(dbc.Col, style={'width': '60%', 'display':'inline-block'}).child(dbc.Col).child(   
+                                    dcc.Graph, figure=go.Figure(), config={'modeBarButtonsToRemove': ['lasso2d']},
+                                    style={})
+        hover_fits_image = all_sky_map_row.child(dbc.Col, style={'width': '30%', 'display': 'inline-block'}).child(dbc.Col).child(    
+                                    dcc.Graph, figure=go.Figure(),
+                                    style={})
 
+        # Row containing scatter and histogram parameter dropdowns
+        scatter_hist_param = body.child(dbc.Row,
+                                    style={
+                                    'margin-top': '50px',
+                                    'margin-bottom': '50px',
+                                    'width': '100%'
+                                    })
+        
+        scatter_button_container = scatter_hist_param.child(dbc.Col,style={'display': 'inline-block', 'width': '50%'}).child(dbc.Row)
 
-@app.callback(
-    Output('sky-map', 'figure'),
-    [Input('scatter', 'selectedData'),
-     Input('x-dropdown', 'value'),
-     Input('y-dropdown', 'value'),
-     Input('hist-param', 'value'),
-     Input('histogram', 'selectedData')]
-    )
-def update_sky_map(selectedData,param1,param2,histparam,histSelectedData):
-    event = dash.callback_context.triggered[0]["prop_id"].split('.')[0]
-    if(selectedData == None and histSelectedData == None):
-        fig = go.Figure(data=[go.Scatter(x=dustopedia.data['RA'], 
-                    y=dustopedia.data['DEC'], 
-                    mode='markers',
-                    marker=dict(color='#FC8D62'),
-                    name='Dustopedia')])
-        fig.add_trace(go.Scatter(x=kingfish.data['RA'], 
-                    y=kingfish.data['DEC'],
-                    mode='markers',
-                    marker=dict(color='#66C2A5'),
-                    name='Kingfish')) 
-        fig.add_trace(go.Scatter(x=dgs.data['RA'], 
-                    y=dgs.data['DEC'],
-                    mode='markers',
-                    marker=dict(color='#8DA0CB'),
-                    name='DGS'))
-        fig.update_layout(
-                title='All Sky Map',
-                xaxis_title="RA",
-                yaxis_title="DEC"
-            )
-    elif(event == 'x-dropdown' or event == 'y-dropdown' or event == 'hist-param'):
-        return dash.no_update
-    elif((selectedData != None and 'range' in selectedData) or (histSelectedData != None and 'range' in histSelectedData)):
-        if(selectedData != None):
-            xmin,xmax = selectedData['range']['x'][0:2]
-            ymin,ymax = selectedData['range']['y'][0:2]
-        else: 
-            xmin,xmax = (min(kingfish.data[param1].min(),dustopedia.data[param1].min(),dgs.data[param1].min()),
-                         max(kingfish.data[param1].max(),dustopedia.data[param1].max(),dgs.data[param1].max()))
-            ymin,ymax = (min(kingfish.data[param2].min(),dustopedia.data[param2].min(),dgs.data[param2].min()),
-                         max(kingfish.data[param2].max(),dustopedia.data[param2].max(),dgs.data[param2].max()))
-            
-        if(histSelectedData != None):
-            histmin,histmax = histSelectedData['range']['x'][0:2]
-        else:
-            histmin,histmax = (min(kingfish.data[histparam].min(),dustopedia.data[histparam].min(),dgs.data[histparam].min()),
-                               max(kingfish.data[histparam].max(),dustopedia.data[histparam].max(),dgs.data[histparam].max()))
-            
-        kingMask = ((kingfish.data[param1] >= xmin) & 
-                (kingfish.data[param1] < xmax) &
-                (kingfish.data[param2] >= ymin) &
-                (kingfish.data[param2] < ymax) &
-                (kingfish.data[histparam] < histmax) &
-                (kingfish.data[histparam] >= histmin))
-        dustMask = ((dustopedia.data[param1] >= xmin) & 
-                (dustopedia.data[param1] < xmax) &
-                (dustopedia.data[param2] >= ymin) &
-                (dustopedia.data[param2] < ymax) &
-                (dustopedia.data[histparam] < histmax) &
-                (dustopedia.data[histparam] >= histmin))
-        dgsMask = ((dgs.data[param1] >= xmin) & 
-                (dgs.data[param1] < xmax) &
-                (dgs.data[param2] >= ymin) &
-                (dgs.data[param2] < ymax) &
-                (dgs.data[histparam] < histmax) &
-                (dgs.data[histparam] >= histmin))
-        fig = go.Figure(data=[go.Scatter(x=dustopedia.data[dustMask]['RA'], 
-                        y=dustopedia.data[dustMask]['DEC'],
-                        mode='markers',
-                        marker=dict(color='#FC8D62'),
-                        name='Dustopedia')])
-        fig.add_trace(go.Scatter(x=kingfish.data[kingMask]['RA'], 
-                        y=kingfish.data[kingMask]['DEC'],
-                        mode='markers',
-                        marker=dict(color='#66C2A5'),
-                        name='Kingfish'))
-        fig.add_trace(go.Scatter(x=dgs.data[dgsMask]['RA'],
-                        y=dgs.data[dgsMask]['DEC'],
-                        mode='markers',
-                        marker=dict(color='#8DA0CB'),
-                        name='DGS'))
-        fig.update_layout(
-                title='All Sky Map',
-                xaxis_title="RA",
-                yaxis_title="DEC"
-            )
-    return fig
+        xparam_dropdown = scatter_button_container.child(dbc.Col, style={'display': 'inline-block', 'width': '50%'}).child(
+                                    dcc.Dropdown,
+                                    style={})
+        xparam_dropdown.options = self.sc.get_axes_options()
+        xparam_dropdown.value = 'RA'
 
-@app.callback(
-    Output('scatter', 'figure'),
-    [Input('x-dropdown', 'value'),
-     Input('y-dropdown', 'value')]
-    )
-def update_scatter(param1, param2):
-    fig = go.Figure(data=[go.Scatter(x=dustopedia.data[param1], 
-                    y=dustopedia.data[param2], 
-                    mode='markers',
-                    marker=dict(color='#FC8D62'),
-                    name='Dustopedia')])
-    fig.add_trace(go.Scatter(x=kingfish.data[param1], 
-                    y=kingfish.data[param2],
-                    mode='markers',
-                    marker=dict(color='#66C2A5'),
-                    name='Kingfish')) 
-    fig.add_trace(go.Scatter(x=dgs.data[param1], 
-                    y=dgs.data[param2],
-                    mode='markers',
-                    marker=dict(color='#8DA0CB'),
-                    name='DGS'))
-    fig.update_layout(
-                xaxis_title=param1,
-                yaxis_title=param2
-            )
-    return fig
+        yparam_dropdown = scatter_button_container.child(dbc.Col, style={'width':'50%','display': 'inline-block'}).child(dbc.Row).child(
+                                    dcc.Dropdown,
+                                    style={})
+        yparam_dropdown.options = self.sc.get_axes_options()
+        yparam_dropdown.value = 'DEC'
 
-@app.callback(
-    Output('histogram', 'figure'),
-    Input('hist-param', 'value')
-    )
-def update_hist(param):
-    fig = go.Figure(data=[go.Histogram(x=dustopedia.data[param],
-                    marker=dict(color='#FC8D62'),
-                    name='Dustopedia',
-                    nbinsx=int(np.sqrt(len(dustopedia.data[param]))))])
-    fig.add_trace(go.Histogram(x=kingfish.data[param], 
-                    marker=dict(color='#66C2A5'),
-                    name='Kingfish',
-                    nbinsx=int(np.sqrt(len(dustopedia.data[param])))))
-    fig.add_trace(go.Histogram(x=dgs.data[param], 
-                    marker=dict(color='#8DA0CB'),
-                    name='DGS',
-                    nbinsx=int(np.sqrt(len(dustopedia.data[param])))))
-    fig.update_layout(barmode='stack',
-                    xaxis_title=param )
-    return fig
+        hist_button_container = scatter_hist_param.child(dbc.Col, style={'display': 'inline-block', 'width': '50%'})
+                                    
+        histparam_dropdown = hist_button_container.child(dbc.Row).child(dbc.Col).child(
+                                    dcc.Dropdown, 
+                                    style={})
+        histparam_dropdown.options = self.sc.get_axes_options()
+        histparam_dropdown.value = 'Redshift'
 
-if __name__ == '__main__':
-    app.run_server(debug=True)
+        # Row containing scatter plot and histogram
+        scatter_hist_graphs = body.child(dbc.Row,
+                                    style={
+                                    'margin-top': '50px',
+                                    'margin-bottom': '50px',
+                                    'width': '100%'
+                                    })
 
+        scatter_plot_container = scatter_hist_graphs.child(dbc.Col,
+                                    style={
+                                    'display': 'inline-block',
+                                    'width': '50%'
+                                    })
+        
+        scatter_plot = scatter_plot_container.child(dbc.Row).child(
+                                    dcc.Graph, figure=go.Figure(),
+                                    config={'modeBarButtonsToRemove': ['lasso2d']},
+                                    style={})
+
+        
+        hist_container = scatter_hist_graphs.child(dbc.Col,
+                                    style={
+                                    'display': 'inline-block',
+                                    'width': '50%'
+                                    })
+        hist_plot = hist_container.child(dbc.Row).child(dbc.Col).child(
+                                    dcc.Graph, figure=go.Figure(),
+                                    config={'modeBarButtonsToRemove': ['lasso2d']},
+                                    style={})
+
+        
+        # Callback functions to update fits image and dropdowns
+        def update_sample_name_dropdown(skyClickData):
+            """
+            Takes in clickData from all sky map and updates sample in dropdown.
+            """
+            sample = self.sc.update_sample_dropdown(skyClickData)
+            return sample
+        app.callback(
+            Output(sample_dropdown.id, 'value'),
+            Input(all_sky_map.id, 'clickData')
+            )(functools.partial(update_sample_name_dropdown))
+
+        def update_galaxy_names_dropdown(sampleName, skyClickData):
+            """
+            Uses input from either the sample dropdown or all sky map clickData
+            to update the list of galaxy names. 
+            """
+            new_names, galaxyValue = self.sc.update_galaxy_names_dropdown(sampleName,skyClickData)
+            return new_names, galaxyValue
+        app.callback(
+            [Output(galaxy_dropdown.id,'options'),
+            Output(galaxy_dropdown.id, 'value')],
+            [Input(sample_dropdown.id,'value'), 
+            Input(all_sky_map.id,'clickData')]
+            )(functools.partial(update_galaxy_names_dropdown))
+
+        def update_herschel_fits_image(sampleName, galaxyName, skyClickData, herschelBand, area_deg2, options):
+            """
+            Uses the selected sample and galaxy names to update the herschel image. If 
+            the event includes clickData, it will use the selected herschel band to update
+            the image. It will also add a box for the map area if selected.
+            """
+            event = dash.callback_context.triggered[0]['prop_id']
+            figure = self.sc.update_herschel_fits_image(sampleName, galaxyName, skyClickData, herschelBand, area_deg2, options, event)
+            return figure
+        app.callback(
+            [Output(herschel_fits_image.id, "figure")],
+            [Input(sample_dropdown.id, "value"),
+             Input(galaxy_dropdown.id, "value"),
+             Input(all_sky_map.id, "clickData"),
+             Input(herschel_band_dropdown.id, "value"),
+             Input(fit_area_input.id, "value"),
+             Input(options_checklist.id, "value"),
+             ] # Input(herschel_map_select.id, "value") this determines signal or uncertainty map
+            )(functools.partial(update_herschel_fits_image))
+
+        def update_flux_fit(galaxyName, herschelBand, herschelClickData, sampleName, toltecBand, time, area_deg2, atm, beta, options):
+            """
+            Takes all imput parameters and outputs the flux fit figure, flux fit 
+            table, and toltec image.
+            """
+            sample = self.sc.samples[sampleName]
+            event = dash.callback_context.triggered[0]['prop_id']
+            print(event)
+            if 'clickData' in event or 'dropdown3' in event or 'input' in event:
+                fit_fig, toltec_fits_image, fit_table = sample.update_fit(galaxyName, sampleName, herschelBand, herschelClickData, sample, toltecBand, time, area_deg2, atm, beta, options)
+                return [fit_fig, toltec_fits_image, fit_table]
+            else:
+                return [dash.no_update, dash.no_update, dash.no_update]
+        app.callback(
+            [Output(flux_fit.id, "figure"),
+            Output(toltec_fits_image.id, "figure"),
+            Output(flux_fit_table.id, 'children')],
+            [Input(galaxy_dropdown.id, "value"),
+            Input(herschel_band_dropdown.id, "value"),
+            Input(herschel_fits_image.id, "clickData"),
+            Input(sample_dropdown.id, 'value'),
+            Input(toltec_band_dropdown.id, "value"),
+            Input(fit_time_input.id, "value"),
+            Input(fit_area_input.id, "value"),
+            Input(fit_atm_input.id, "value"),
+            Input(fit_beta_input.id, "value"),
+            Input(options_checklist.id, "value")]
+            )(functools.partial(update_flux_fit))
+
+        def update_scatter(xparam, yparam):
+            """
+            Changes x and y axes values based on dropdowns.
+            """
+            figure = self.sc.update_scatter(xparam, yparam)
+            return figure  
+        app.callback(
+            [Output(scatter_plot.id, "figure")],
+            [Input(xparam_dropdown.id, "value"),
+             Input(yparam_dropdown.id, "value")]
+            )(functools.partial(update_scatter))
+
+        def update_hist(param):
+            """
+            Updates histogram exis based on dropdown.
+            """
+            figure = self.sc.update_hist(param)
+            return figure 
+        app.callback(
+            [Output(hist_plot.id, "figure")],
+            [Input(histparam_dropdown.id, "value")]
+            )(functools.partial(update_hist))
+
+        def update_sky_map(selectedData,param1,param2,histparam,histSelectedData):
+            """
+            Filters the all sky map accorning to the selected data from the
+            scatter plot and histogram.
+            """
+            event = dash.callback_context.triggered[0]["prop_id"] 
+            figure = self.sc.update_sky_map(selectedData,param1,param2,histparam,histSelectedData,event)
+            return figure
+        app.callback(
+            [Output(all_sky_map.id, "figure")],
+            [Input(scatter_plot.id, "selectedData"),
+             Input(xparam_dropdown.id, "value"),
+             Input(yparam_dropdown.id, "value"),
+             Input(histparam_dropdown.id, "value"),
+             Input(hist_plot.id, "selectedData")]
+            )(functools.partial(update_sky_map))
+        
+        def update_hover_fits(hoverData):
+            """
+            Updates the small hover fits image based on point hovered over
+            on the all sky map.
+            """
+            event = dash.callback_context.triggered[0]["prop_id"] 
+            figure = self.sc.update_hover_fits(hoverData,event)
+            return figure 
+        app.callback(
+            [Output(hover_fits_image.id, "figure")],
+            [Input(all_sky_map.id, "hoverData")
+            ])(functools.partial(update_hover_fits))
+        
+
+# This declares and runs the above class.  Change the name to match the class
+# above
+extensions = [
+{
+    'module': 'dasha.web.extensions.dasha',
+    'config': {
+        'template': sample_definition_page,
+        'title_text': 'Sample Selection',
+        }
+    },
+]
