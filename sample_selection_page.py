@@ -219,7 +219,7 @@ class sample_definition_page(ComponentTemplate):
         xparam_dropdown.options = self.sc.get_axes_options()
         xparam_dropdown.value = 'RA'
 
-        yparam_dropdown = scatter_button_container.child(dbc.Col, style={'width':'50%','display': 'inline-block'}).child(dbc.Row).child(
+        yparam_dropdown = scatter_button_container.child(dbc.Col, style={'width':'50%','display': 'inline-block'}).child(
                                     dcc.Dropdown,
                                     style={})
         yparam_dropdown.options = self.sc.get_axes_options()
