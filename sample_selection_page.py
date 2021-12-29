@@ -14,17 +14,18 @@ import os
 import dash
 
 import sys
-sys.path.insert(0, r"C:\Fall_2020_Wilson_Lab\SN_page\galaxy-selection-page")
+sys.path.insert(0, r"C:\Fall_2020_Wilson_Lab\SN_page")
 
-from sample_selection_class import sample_definition_class
+from dasha_sample_selection_class import sample_definition_class
 
-from dash.dependencies import Output, Input
+from dash.dependencies import Output, Input, State
 from dash import no_update, exceptions
 import functools
 # This import grabs the main class setup components
 from dasha.web.templates import ComponentTemplate
 from dasha.web.extensions.cache import cache
 from tollan.utils.log import timeit, get_logger
+import dash_daq as daq
 
 # We get the usual dash bootstrap components in a different way in dasha
 import dash_bootstrap_components as dbc
@@ -52,6 +53,7 @@ class sample_definition_page(ComponentTemplate):
     # also define other functions and call them in here.  Note that it takes
     # the dash 'app' as input for the call-backs.
     def setup_layout(self, app):
+
         app.config.external_stylesheets.append(dbc.themes.LUX)
         container = self
 
@@ -59,21 +61,55 @@ class sample_definition_page(ComponentTemplate):
         header_container, body = container.grid(2,1)
         
         # Create the header as a child of the header_container.
-        header = header_container.child(LiveUpdateSection(
-            title_component=html.H2("Galaxy Selection",
+        header = header_container.child(dbc.Row).child(dbc.Col).child(
+            html.H2("Galaxy Selection",
                                     style={
-                                        'margin-top': '50px',
-                                        'margin-bottom': '50px'
-                                        }),
-            interval_options=[2000, 5000],
-            interval_option_value=5000))
+                                        'margin-top': '25px',
+                                        'margin-bottom': '25px'
+                                        }))
+        # header = header_container.child(LiveUpdateSection(
+        #     title_component=html.H2("Galaxy Selection",
+        #                             style={
+        #                                 'margin-top': '150px',
+        #                                 'margin-bottom': '50px'
+        #                                 }),
+        #     interval_options=[2000, 5000],
+        #     interval_option_value=5000))
+        
+        # Create radio item for switching between dark and list theme
+        # theme_switch = body.child(dbc.Row).child(dbc.Col).child(dcc.RadioItems)
+        # theme_switch.options = [{'label': 'Dark', 'value': dbc.themes.COSMO},
+        #                         {'label': 'Light', 'value': dbc.themes.LUX}]
+        # theme_switch.value = dbc.themes.LUX
+
+        # Text explaining components of page
+        text = '''Welcome to the galaxy sample selection page! Galaxies from the _Herschel_ DGS and \
+                KINGFISH samples can be selected directly by name from the dropdowns below. \
+                _Herschel_ SPIRE images will be plotted for the galaxy, if possible. Selecting \
+                pixels from these maps produces TolTEC singal-to-noise maps for the 1.1 mm, 1.4 mm, \
+                and 2.0 mm bands, as well as fitting a greybody to the pixel. This fit is displayed \
+                below, along with a table including the fit parameters. \
+                You can also filter galaxies on the scatter plot and histogram at the very bottom \
+                of the page using the box select tool. Changing the axes with the dropdowns allows \
+                you to change which parameters you filter for. The filtered set of galaxies are \
+                plotted on the All Sky Map. Points in this plot can be hovered over to preview their \
+                250 micron SPIRE image to the right, or clicked on to plot above. \
+                Please note that no fits images are included for galaxies in the Dustopedia sample. \
+                they are included on the scatter plots and histogram to provide background date for \
+                the other samples.'''
+        description = body.child(dbc.Row).child(dbc.Col, 
+                        style={'width': '70%'}).child(  # , 'margin-top': '50px','margin-bottom': '50px'
+                        dbc.Card, color='info', outline=True).child(
+                        dbc.CardBody(dcc.Markdown(text), className='card-text'))
 
         # Row containing the sample, galaxy, herschel band, toltec band, map type dropdowns
-        fits_dropdowns_container = body.child(dbc.Row, 
+        fits_dropdowns_container_card = body.child(dbc.Row, 
                                     style={
-                                    'margin-top': '50px',
-                                    'margin-bottom': '50px'
-                                    })
+                                    'margin-top': '25px',
+                                    'margin-bottom': '25px'
+                                    }).child(dbc.Col, style={'width': '70%'}
+                                    ).child(dbc.Card, className='w-100', color='secondary')
+        fits_dropdowns_container = fits_dropdowns_container_card.child(dbc.CardBody)
         
         sample_dropdown = fits_dropdowns_container.child(dbc.Col, style={'display': 'inline-block', 'width': '20%'}).child(
                                     dcc.Dropdown,
@@ -102,25 +138,34 @@ class sample_definition_page(ComponentTemplate):
         signal_uncertainty_button = fits_dropdowns_container.child(dbc.Col, style={'display': 'inline-block', 'width': '20%'}).child(
                                     dcc.RadioItems,
                                     style={
-                                    'width': '35%'
+                                    # 'width': '35%'
                                     })
         signal_uncertainty_button.options = self.sc.get_sig_unc()
         signal_uncertainty_button.value = 'S/N'
+        signal_uncertainty_button.labelStyle = {'display': 'flex'}
 
         # Row containing herschel and toltec fits images
         herschel_toltec_fits = body.child(dbc.Row, 
                                     style={})
+        
+        herschel_fits_container_card = herschel_toltec_fits.child(dbc.Col, style={'width': '40%'}
+                                    ).child(dbc.Card, className='w-100')
+        herschel_fits_container = herschel_fits_container_card.child(dbc.CardBody)
 
-        herschel_fits_image = herschel_toltec_fits.child(dbc.Col, 
-                                    style = {'width': '50%', 'display': 'inline-block'}).child(
+        herschel_fits_image = herschel_fits_container.child(dbc.Col, 
+                                    style = {'display': 'inline-block'}).child( # 'width': '50%', 
                                         dcc.Graph, figure=go.Figure(),
                                         style={
                                         # 'width': '34%',
                                         # 'margin-left': '30%'
                                     })
         
-        toltec_fits_image = herschel_toltec_fits.child(dbc.Col, 
-                                    style = {'width': '50%', 'display': 'inline-block'}).child(
+        toltec_fits_container_card = herschel_toltec_fits.child(dbc.Col, style={'width': '40%'}
+                                    ).child(dbc.Card, className='w-100')
+        toltec_fits_container = toltec_fits_container_card.child(dbc.CardBody)
+        
+        toltec_fits_image = toltec_fits_container.child(dbc.Col, 
+                                    style = {'display': 'inline-block'}).child(  # 'width': '50%', 
                                         dcc.Graph, figure=go.Figure(),
                                         style={
                                         # 'width': '34%',
@@ -128,7 +173,15 @@ class sample_definition_page(ComponentTemplate):
                                     })
         
         # Row containing fits mapping options
-        options_checklist = body.child(dbc.Row).child(dbc.Checklist,
+
+        options_checklist_card = body.child(dbc.Row, style={
+                                    'margin-top': '25px',
+                                    'margin-bottom': '25px'
+                                    }).child(dbc.Col, style={'width': '50%'}
+                                    ).child(dbc.Card, className='w-100')
+        options_checklist_container = options_checklist_card.child(dbc.CardBody)
+        
+        options_checklist = options_checklist_container.child(dbc.Row).child(dbc.Checklist,
                                                        options=[
                 {"label": "Show Map Area", "value": "show map"},
                 {"label": "Show Array", "value": "show array"},
@@ -140,14 +193,14 @@ class sample_definition_page(ComponentTemplate):
                     "margin-bottom": "50"})
         
         # Row containing fitting options
-        fitting_inputs = body.child(dbc.Row,
+        fitting_inputs = options_checklist_container.child(dbc.Row,
                                     style={
-                                    'margin-top': '50px',
-                                    'margin-bottom': '50px',
+                                    'margin-top': '15px',
+                                    # 'margin-bottom': '50px',
                                     'width': '100%'
                                     }).child(dbc.InputGroup, size='sm',
                                     style={
-                                    "margin-right": "20px",
+                                    "margin-right": "25px",
                                     "margin-left": "20px"
                                     })
 
@@ -169,10 +222,17 @@ class sample_definition_page(ComponentTemplate):
         fit_beta_input = fitting_inputs.child(dbc.Input, value=2.0)
 
         # Container for the row containing the flux fit and table
-        flux_fit_and_data_table = body.child(dbc.Row,
+        flux_fit_data_table_card = body.child(dbc.Row, style={
+                                    # 'margin-top': '25px',
+                                    # 'margin-bottom': '25px'
+                                    }).child(dbc.Col, style={'width': '70%'}
+                                    ).child(dbc.Card, className='w-100')
+        flux_fit_data_table_container = flux_fit_data_table_card.child(dbc.CardBody)
+
+        flux_fit_and_data_table = flux_fit_data_table_container.child(dbc.Row,
                                     style={
-                                    'margin-top': '50px',
-                                    'margin-bottom': '50px',
+                                    # 'margin-top': '50px',
+                                    # 'margin-bottom': '50px',
                                     'width': '100%'
                                     })
         
@@ -190,28 +250,29 @@ class sample_definition_page(ComponentTemplate):
         # Container for the row containing the all sky map
         all_sky_map_row = body.child(dbc.Row,
                                     style={
-                                    'margin-top': '50px',
-                                    'margin-bottom': '50px',
-                                    'width': '100%'
-                                    })
+                                    'margin-top': '25px',
+                                    'margin-bottom': '25px'
+                                    }).child(dbc.Col, style={'width': '70%'}).child(
+                                    dbc.Card, className='w-100').child(dbc.CardBody)
         
         #Container for row containing all sky map and hover preview image
-        all_sky_map = all_sky_map_row.child(dbc.Col, style={'width': '60%', 'display':'inline-block'}).child(dbc.Col).child(   
+        all_sky_map = all_sky_map_row.child(dbc.Col, style={'width': '60%', 'display':'inline-block'}).child(   
                                     dcc.Graph, figure=go.Figure(), config={'modeBarButtonsToRemove': ['lasso2d']},
                                     style={})
-        hover_fits_image = all_sky_map_row.child(dbc.Col, style={'width': '30%', 'display': 'inline-block'}).child(dbc.Col).child(    
+        hover_fits_image = all_sky_map_row.child(dbc.Col, style={'width': '40%', 'display': 'inline-block'}).child(    
                                     dcc.Graph, figure=go.Figure(),
                                     style={})
 
         # Row containing scatter and histogram parameter dropdowns
         scatter_hist_param = body.child(dbc.Row,
                                     style={
-                                    'margin-top': '50px',
-                                    'margin-bottom': '50px',
-                                    'width': '100%'
-                                    })
+                                    # 'margin-top': '50px',
+                                    # 'margin-bottom': '50px',
+                                    # 'width': '100%'
+                                    }).child(dbc.Col, style={'width': '70%'}).child(
+                                    dbc.Card, className='w-100').child(dbc.CardBody)
         
-        scatter_button_container = scatter_hist_param.child(dbc.Col,style={'display': 'inline-block', 'width': '50%'}).child(dbc.Row)
+        scatter_button_container = scatter_hist_param.child(dbc.Col,style={'display': 'inline-block', 'width': '50%'}).child(dbc.Row) #
 
         xparam_dropdown = scatter_button_container.child(dbc.Col, style={'display': 'inline-block', 'width': '50%'}).child(
                                     dcc.Dropdown,
@@ -219,7 +280,7 @@ class sample_definition_page(ComponentTemplate):
         xparam_dropdown.options = self.sc.get_axes_options()
         xparam_dropdown.value = 'RA'
 
-        yparam_dropdown = scatter_button_container.child(dbc.Col, style={'width':'50%','display': 'inline-block'}).child(
+        yparam_dropdown = scatter_button_container.child(dbc.Col, style={'display': 'inline-block','width':'50%'}).child(  #child(dbc.Row).
                                     dcc.Dropdown,
                                     style={})
         yparam_dropdown.options = self.sc.get_axes_options()
@@ -236,10 +297,10 @@ class sample_definition_page(ComponentTemplate):
         # Row containing scatter plot and histogram
         scatter_hist_graphs = body.child(dbc.Row,
                                     style={
-                                    'margin-top': '50px',
-                                    'margin-bottom': '50px',
-                                    'width': '100%'
-                                    })
+                                    'margin-top': '25px',
+                                    'margin-bottom': '25px'
+                                    }).child(dbc.Col, style={'width': '70%'}).child(
+                                    dbc.Card, className='w-100').child(dbc.CardBody)
 
         scatter_plot_container = scatter_hist_graphs.child(dbc.Col,
                                     style={
@@ -262,7 +323,7 @@ class sample_definition_page(ComponentTemplate):
                                     dcc.Graph, figure=go.Figure(),
                                     config={'modeBarButtonsToRemove': ['lasso2d']},
                                     style={})
-
+        
         
         # Callback functions to update fits image and dropdowns
         def update_sample_name_dropdown(skyClickData):
@@ -392,6 +453,18 @@ class sample_definition_page(ComponentTemplate):
             [Input(all_sky_map.id, "hoverData")
             ])(functools.partial(update_hover_fits))
         
+        
+        # def switch_theme(setTheme):
+        #     print(app.config.external_stylesheets)
+        #     if len(app.config.external_stylesheets >= 1):
+        #         app.config.external_stylesheets.pop()
+        #         app.config.external_stylesheets.append(setTheme)
+        #     else:
+        #         app.config.external_stylesheets.append(setTheme)
+        #     return 
+        # app.callback(
+        #     Input(theme_switch.id, 'value')
+        # )(functools.partial(switch_theme))
 
 # This declares and runs the above class.  Change the name to match the class
 # above
