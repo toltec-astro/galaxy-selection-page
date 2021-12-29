@@ -95,7 +95,7 @@ class sample_definition_page(ComponentTemplate):
                 plotted on the All Sky Map. Points in this plot can be hovered over to preview their \
                 250 micron SPIRE image to the right, or clicked on to plot above. \
                 Please note that no fits images are included for galaxies in the Dustopedia sample. \
-                they are included on the scatter plots and histogram to provide background date for \
+                they are included on the scatter plots and histogram to provide background data for \
                 the other samples.'''
         description = body.child(dbc.Row).child(dbc.Col, 
                         style={'width': '70%'}).child(  # , 'margin-top': '50px','margin-bottom': '50px'
