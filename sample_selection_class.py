@@ -5,11 +5,11 @@ functions for the dash page
 """
 import os
 import sys
-sys.path.insert(0, r"C:\Fall_2020_Wilson_Lab\SN_page\galaxy-selection-page")
+from pathlib import Path
 
-from galaxy_class import Sample as gc
+from .galaxy_class import Sample as gc
 import plotly.graph_objs as go
-from astropy.utils.data import get_pkg_data_filename
+# from astropy.utils.data import get_pkg_data_filename
 from astropy.io import fits, ascii
 import numpy as np
 import dash
@@ -25,13 +25,13 @@ class sample_definition_class():
     
     # Create galaxy objects for each sample
     def read_in_data(self):
-        dustopedia_csv = os.path.join('Samples','dustopedia_sample.csv')
-
-        kingfish_csv = os.path.join('Samples','kingfish_sample.csv')
-        kingfish_fits = os.listdir("C:\Fall_2020_Wilson_Lab\SN_Page\Samples\Kingfish_FITS\Spire\KINGFISH_SPIRE_v3.0_updated\KINGFISH_SPIRE_v3.0_updated")
-
-        dgs_csv = os.path.join('Samples','dgs_sample.csv')
-        dgs_fits = os.listdir("C:\Fall_2020_Wilson_Lab\SN_Page\Samples\DGS_FITS\Renamed_FITs")
+        # Get Paths to data (csv and fits)
+        datadir = Path(__file__).parent.joinpath('data')
+        dustopedia_csv = datadir.joinpath('Samples/dustopedia_sample.csv').as_posix()
+        kingfish_csv = datadir.joinpath('Samples/kingfish_sample.csv').as_posix()
+        kingfish_fits = os.listdir(datadir.joinpath("Samples/Kingfish_FITS/Spire/KINGFISH_SPIRE_v3.0_updated_updated/KINGFISH_SPIRE_v3.0_updated_updated").as_posix())
+        dgs_csv = datadir.joinpath('Samples','dgs_sample.csv').as_posix()
+        dgs_fits = os.listdir(datadir.joinpath("Samples/DGS_FITS/Renamed_FITs").as_posix())
 
         dustopedia = gc('Dustopedia',dustopedia_csv)
         kingfish = gc('Kingfish',kingfish_csv,kingfish_fits)
@@ -204,7 +204,8 @@ class sample_definition_class():
                     galaxyName = kingfish.data['Object Name'][row].values[0]
                     color_label, x, y = kingfish.update_herschel('Kingfish', galaxyName, herschelBand)
                     img_path = kingfish.data[herschelBand][row].values[0]
-                    img_data = get_pkg_data_filename(img_path)  
+                    # img_data = get_pkg_data_filename(img_path)  
+                    img_data = img_path
                     img = fits.getdata(img_data, ext=0)
                     fig = go.Figure()
                     fig.add_trace(go.Heatmap(x=x, y=y, z=img, zmax=img.max(),zmin=img.min(), colorbar = {'title': color_label}))
@@ -219,7 +220,8 @@ class sample_definition_class():
                     galaxyName = dgs.data['Object Name'][row].values[0]
                     color_label, x, y = dgs.update_herschel('DGS', galaxyName, herschelBand)
                     img_path = dgs.data[herschelBand][row].values[0]
-                    img_data = get_pkg_data_filename(img_path)  
+                    # img_data = get_pkg_data_filename(img_path)  
+                    img_data = img_path
                     img = fits.getdata(img_data, ext=0)
                     fig = go.Figure()
                     fig.add_trace(go.Heatmap(x=x, y=y, z=img, zmax=img.max(),zmin=img.min(), colorbar = {'title': color_label}))
@@ -235,7 +237,8 @@ class sample_definition_class():
                 if (sample.data[herschelBand][row].values[0] != None):
                     color_label, x, y = sample.update_herschel(sampleName, galaxyName, herschelBand)
                     img_path = sample.data[herschelBand][sample.data['Object Name'] == galaxyName].values[0]
-                    img_data = get_pkg_data_filename(img_path)
+                    # img_data = get_pkg_data_filename(img_path)
+                    img_data = img_path
                     img = fits.getdata(img_data, ext=0)
                     fig = go.Figure()
                     fig.add_trace(go.Heatmap(x=x, y=y, z=img, zmax=img.max(),zmin=img.min(), colorbar = {'title': color_label}))
@@ -357,7 +360,8 @@ class sample_definition_class():
                         galaxyName = kingfish.data['Object Name'][row].values[0]
                         color_label, x, y = kingfish.update_herschel('Kingfish', galaxyName, herschelBand)
                         img_path = kingfish.data[herschelBand][row].values[0]
-                        img_data = get_pkg_data_filename(img_path)  
+                        # img_data = get_pkg_data_filename(img_path)  
+                        img_data = img_path
                         img = fits.getdata(img_data, ext=0)
                         fig = go.Figure()
                         fig.add_trace(go.Heatmap(x=x, y=y, z=img, zmax=img.max(),zmin=img.min(), colorbar = {'title': color_label}))
@@ -372,7 +376,8 @@ class sample_definition_class():
                     galaxyName = dgs.data['Object Name'][row].values[0]
                     color_label, x, y = dgs.update_herschel('DGS', galaxyName, herschelBand)
                     img_path = dgs.data[herschelBand][row].values[0]
-                    img_data = get_pkg_data_filename(img_path)  
+                    # img_data = get_pkg_data_filename(img_path)  
+                    img_data = img_path
                     img = fits.getdata(img_data, ext=0)
                     fig = go.Figure()
                     fig.add_trace(go.Heatmap(x=x, y=y, z=img, zmax=img.max(),zmin=img.min(), colorbar = {'title': color_label}))

@@ -14,9 +14,13 @@ import os
 import dash
 
 import sys
-sys.path.insert(0, r"C:\Fall_2020_Wilson_Lab\SN_page\galaxy-selection-page")
+from pathlib import Path
 
-from sample_selection_class import sample_definition_class
+# sys.path.insert(0, r"C:\Fall_2020_Wilson_Lab\SN_page\galaxy-selection-page")
+# make available the repo folder as a package
+sys.path.insert(0, Path(__file__).parent.parent.as_posix())
+
+from galaxy_selection_page.sample_selection_class import sample_definition_class
 
 from dash.dependencies import Output, Input
 from dash import no_update, exceptions
@@ -400,7 +404,16 @@ extensions = [
     'module': 'dasha.web.extensions.dasha',
     'config': {
         'template': sample_definition_page,
-        'title_text': 'Sample Selection',
+        'title_text': 'Galaxy Sample Selection',
         }
     },
+    {
+             'module': 'dasha.web.extensions.cache',
+             'config': {
+                 "CACHE_TYPE": 'redis',
+                 "CACHE_DEFAULT_TIMEOUT": 60 * 5,  # second
+                 "CACHE_KEY_PREFIX": 'tolteca_',
+                 "CACHE_REDIS_URL": f"redis://localhost:6379/0",
+                 }
+             },
 ]

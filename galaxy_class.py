@@ -25,10 +25,16 @@ import plotly.graph_objs as go
 import dash
 import dash_bootstrap_components as dbc
 from lmfit import Model, Parameter, report_fit
-from TolTEC import TolTEC
+from .TolTEC import TolTEC
+
+from pathlib import Path
+
+
+datadir = Path(__file__).parent.joinpath('data').as_posix()
+
 
 class Sample:
-    def __init__(self, sampleName, csv, fits=[]):
+    def __init__(self, sampleName, csv, fits=None):
         self.sampleName = sampleName
         self.data = pd.read_csv(csv)
 
@@ -64,7 +70,9 @@ class Sample:
         #Default fit status
         self.fit_status = 'Not Fit'
 
-        self.fits = fits        #paths to all files in fits directory
+        if fits is None:
+             fits = list()
+        self.fits = list(fits)
         self.add_column('250 band')
         self.add_column('350 band')
         self.add_column('500 band')
@@ -89,20 +97,45 @@ class Sample:
         fits = []
         if sampleName == 'Kingfish':
             for i in self.fits[1:]:
-                galaxyName = i.split('_')[0]
-                newName = Ned.query_object(galaxyName)['Object Name'][0]
-                newNameFixed = newName.split(' ')[0]
-                for index in range(1,len(newName.split(' '))):
-                    newNameFixed = newName + '_' + newName.split(' ')[index]
-                fits.append(newName + '_' + i.split('_')[1] + '_' + i.split('_')[2] + '_' + i.split('_')[3] + '_' + i.split('_')[4])
+                # galaxyName = i.split('_')[0]
+                # newName = Ned.query_object(galaxyName)['Object Name'][0]
+                # newNameFixed = newName.split(' ')[0]
+                # for index in range(1,len(newName.split(' '))):
+                #     newNameFixed = newName + '_' + newName.split(' ')[index]
+                # fits.append(newName + '_' + i.split('_')[1] + '_' + i.split('_')[2] + '_' + i.split('_')[3] + '_' + i.split('_')[4])
+                try:
+                     i = os.path.basename(i)
+                     name = i.split('_')[0]
+                     newName = Ned.query_object(name)['Object Name'][0]
+                     newNameFixed = newName.split(' ')[0]
+                     for index in range(1,len(newName.split(' '))):
+                         newNameFixed = newName + '_' + newName.split(' ')[index]
+                     fits.append(newName + '_' + i.split('_')[1] + '_' +
+                             i.split('_')[2] + '_' + i.split('_')[3] + '_' +
+                             i.split('_')[4])
+                except Exception:
+                     print(f'unable to fix name for {i}')
+                     pass
         elif sampleName == 'DGS':
             for i in self.fits:
-                galaxyName = i.split('_')[0]
-                newName = Ned.query_object(galaxyName)['Object Name'][0]
-                newNameFixed = newName.split(' ')[0]
-                for index in range(1,len(newName.split(' '))):
-                    newNameFixed = newName + '_' + newName.split(' ')[index]
-                fits.append(newName + '_' + i.split('_')[1] + '_' + i.split('_')[2])
+                # galaxyName = i.split('_')[0]
+                # newName = Ned.query_object(galaxyName)['Object Name'][0]
+                # newNameFixed = newName.split(' ')[0]
+                # for index in range(1,len(newName.split(' '))):
+                #     newNameFixed = newName + '_' + newName.split(' ')[index]
+                # fits.append(newName + '_' + i.split('_')[1] + '_' + i.split('_')[2])
+                i = os.path.basename(i)
+                try:
+                    name = i.split('_')[0]
+                    newName = Ned.query_object(name)['Object Name'][0]
+                    newNameFixed = newName.split(' ')[0]
+                    for index in range(1,len(newName.split(' '))):
+                        newNameFixed = newName + '_' + newName.split(' ')[index]
+                    fits.append(newName + '_' + i.split('_')[1] + '_' +
+                            i.split('_')[2])
+                except Exception:
+                    print(f'unable to fix name for {i}')
+                    pass
         return fits
             
     # Adds new columns
@@ -132,9 +165,11 @@ class Sample:
     def loadSpire(self,fits_paths, fixed_name_fits, galaxyName, sampleName):     
         hdu = 0
         if sampleName == 'Kingfish':
-            path = os.path.join('Samples/Kingfish_FITS/Spire/KINGFISH_SPIRE_v3.0_updated/KINGFISH_SPIRE_v3.0_updated')
+            # path = os.path.join('Samples/Kingfish_FITS/Spire/KINGFISH_SPIRE_v3.0_updated/KINGFISH_SPIRE_v3.0_updated')
+            path = os.path.join(datadir, 'Samples/Kingfish_FITS/Spire/KINGFISH_SPIRE_v3.0_updated_updated/KINGFISH_SPIRE_v3.0_updated_updated')
         elif sampleName == 'DGS':
-            path = os.path.join("Samples/DGS_FITS/Renamed_FITs")
+            # path = os.path.join("Samples/DGS_FITS/Renamed_FITs")
+            path = os.path.join(datadir, "Samples/DGS_FITS/Renamed_FITs")
         for i in fits_paths:
             if(('spire250' in i) and ('scan.fits' in i)):
                 self.add_data('250 band',self.data['Object Name'] == galaxyName,os.path.join(path, i))
