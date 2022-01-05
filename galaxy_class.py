@@ -188,12 +188,12 @@ class Sample:
         '''
         try:
             header = img[0].header
-            img = img[1].data
-            nx, ny = img.shape
+            data = img[1].data
+            nx, ny = data.shape
         except:
             header = img[0].header
-            img = img[0].data
-            nx, ny = img.shape
+            data = img[0].data
+            nx, ny = data.shape
 
         # header = img[pos].header
         # img = img[pos].data
